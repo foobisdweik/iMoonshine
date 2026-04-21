@@ -1,0 +1,8 @@
+version: 1
+bundleID: com.foobisdweik.iMoonshine
+product: iMoonshine
+infoPath: Info.plist
+extensions:
+  - product: iMoonshineWidget
+    bundleID: com.foobisdweik.iMoonshine.widget
+    infoPath: WidgetInfo.plist

@@ -1,0 +1,26 @@
+stages:
+  - build
+
+variables:
+  HOMEBREW_NO_AUTO_UPDATE: "1"
+  XTOOL_CONFIGURATION: "release"
+
+.macos_xtool_runner:
+  tags:
+    - saas-macos-medium-m1
+  image: macos-26-xcode-26
+  before_script:
+    - echo "started by ${GITLAB_USER_NAME:-unknown} / @${GITLAB_USER_LOGIN:-unknown}"
+    - chmod +x scripts/ci_macos_unsigned_build.sh
+
+build:unsigned-app:
+  extends:
+    - .macos_xtool_runner
+  stage: build
+  script:
+    - ./scripts/ci_macos_unsigned_build.sh
+  artifacts:
+    when: always
+    expire_in: 7 days
+    paths:
+      - artifacts/

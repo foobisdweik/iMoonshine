@@ -1,0 +1,4 @@
+*.ort filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.ort !text !filter !merge !diff
+*.bin !text !filter !merge !diff
