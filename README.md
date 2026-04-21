@@ -156,7 +156,7 @@ Included files:
 
 The CI job:
 
-- runs on `saas-macos-medium-m1`
+- runs on `saas-macos-large-m2pro`
 - uses `image: macos-26-xcode-26`
 - installs `xtool` with Homebrew if needed
 - builds an unsigned `xtool/iMoonshine.app`

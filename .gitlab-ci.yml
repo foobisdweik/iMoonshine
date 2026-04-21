@@ -7,7 +7,7 @@ variables:
 
 .macos_xtool_runner:
   tags:
-    - saas-macos-medium-m1
+    - saas-macos-large-m2pro
   image: macos-26-xcode-26
   before_script:
     - echo "started by ${GITLAB_USER_NAME:-unknown} / @${GITLAB_USER_LOGIN:-unknown}"
