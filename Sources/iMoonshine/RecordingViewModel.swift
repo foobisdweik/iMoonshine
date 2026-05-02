@@ -1,9 +1,10 @@
 import Foundation
 import SwiftUI
 import UIKit
+import iMoonshineCore
 
 @MainActor
-final class RecordingViewModel: ObservableObject {
+final class RecordingViewModel: ObservableObject, RecordingUIDelegate {
 
     struct LineItem: Identifiable, Equatable {
         let id: UInt64

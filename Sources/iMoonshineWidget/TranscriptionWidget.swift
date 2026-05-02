@@ -1,15 +1,7 @@
 import ActivityKit
 import SwiftUI
 import WidgetKit
-
-// ActivityAttributes must be identical to main app's definition.
-struct TranscriptionActivityAttributes: ActivityAttributes {
-    struct ContentState: Codable, Hashable {
-        var elapsedSeconds: Int
-        var isRecording: Bool
-        var isOverSoftLimit: Bool
-    }
-}
+import iMoonshineCore
 
 @main
 struct iMoonshineWidgetBundle: WidgetBundle {

@@ -18,18 +18,20 @@ import AppIntents
 ///
 /// First press:  perform() starts recording + LiveActivity, returns "".
 /// Second press: perform() stops recording + LiveActivity, returns transcript.
-struct ToggleRecordingIntent: AudioRecordingIntent {
+public struct ToggleRecordingIntent: AudioRecordingIntent {
 
-    static let title: LocalizedStringResource = "Toggle iMoonshine"
-    static let description = IntentDescription(
+    public static let title: LocalizedStringResource = "Toggle iMoonshine"
+    public static let description = IntentDescription(
         "Start or stop iMoonshine voice transcription.",
         categoryName: "iMoonshine"
     )
 
-    static let openAppWhenRun: Bool = false
-    static let isDiscoverable: Bool = true
+    public static let openAppWhenRun: Bool = false
+    public static let isDiscoverable: Bool = true
 
-    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+    public init() {}
+
+    public func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let transcript: String
         do {
             transcript = try await RecordingState.shared.toggle()
@@ -40,8 +42,8 @@ struct ToggleRecordingIntent: AudioRecordingIntent {
     }
 }
 
-struct iMoonshineShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
+public struct iMoonshineShortcuts: AppShortcutsProvider {
+    public static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: ToggleRecordingIntent(),
             phrases: [

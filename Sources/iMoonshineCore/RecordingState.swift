@@ -1,18 +1,19 @@
 import ActivityKit
+import AVFoundation
 import Foundation
 import UIKit
 
-actor RecordingState {
+public actor RecordingState {
 
-    static let shared = RecordingState()
+    public static let shared = RecordingState()
     private init() {}
 
     private static let softLimitSeconds = 60
 
-    private(set) var isRecording = false
+    public private(set) var isRecording = false
 
     private let transcriber = MoonshineTranscriber()
-    private weak var uiDelegate: RecordingViewModel?
+    private weak var uiDelegate: (any RecordingUIDelegate)?
 
     private var completedLines: [String] = []
     private var activeLines: [UInt64: String] = [:]
@@ -21,30 +22,32 @@ actor RecordingState {
 
     // MARK: - Lifecycle
 
-    func preload() { transcriber.loadIfNeeded() }
-    func unload()  { transcriber.unload() }
+    public func preload() { transcriber.loadIfNeeded() }
+    public func unload()  { transcriber.unload() }
 
     // MARK: - UI hook
 
-    func setUIDelegate(_ vm: RecordingViewModel) {
-        self.uiDelegate = vm
+    public func setUIDelegate(_ delegate: any RecordingUIDelegate) {
+        self.uiDelegate = delegate
         transcriber.eventSink = { [weak self] event in
             Task { await self?.forward(event) }
         }
     }
 
-    // MARK: - Toggle (returns transcript on stop, "" on start)
+    // MARK: - Toggle (returns transcript on stop, current clipboard on start)
 
     /// Called by ToggleRecordingIntent.perform() and RecordingViewModel.toggle().
     /// Returns transcript string on stop (used by ReturnsValue for Shortcuts
-    /// clipboard bypass). Returns "" on start.
+    /// clipboard bypass). Returns current clipboard on start to avoid wiping it.
     @discardableResult
-    func toggle() async throws -> String {
+    public func toggle() async throws -> String {
         if isRecording {
             return try await stop()
         } else {
             try await start()
-            return ""
+            // Return current clipboard so Shortcuts "Copy to clipboard" node
+            // effectively does nothing when we are just starting.
+            return await MainActor.run { UIPasteboard.general.string ?? "" }
         }
     }
 
@@ -52,6 +55,15 @@ actor RecordingState {
         completedLines.removeAll()
         activeLines.removeAll()
         recordingStartTime = Date()
+
+        // Configure audio session for background recording.
+        // .record (not .playAndRecord) — mic only, no playback path.
+        // .mixWithOthers — required for AudioRecordingIntent dispatch from
+        // BG-Active state; without it, audiomxd denies setActive(true) with
+        // -12985 ("Cannot interrupt others") when other audio is active.
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.record, mode: .default, options: [.allowBluetooth, .mixWithOthers])
+        try session.setActive(true)
 
         // LiveActivity must be active BEFORE AudioRecordingIntent considers
         // the background audio session valid on iOS 18+.
@@ -94,14 +106,11 @@ actor RecordingState {
 
         await endLiveActivity()
 
-        // If app is in foreground (uiDelegate set), also copy directly +
-        // fire haptic. For background intent path, ReturnsValue handles
-        // clipboard via Shortcuts runtime.
         if let vm = uiDelegate, !full.isEmpty {
             await MainActor.run { vm.didCopyToClipboard(full) }
         } else if !full.isEmpty {
-            // Fire haptic even from background to signal completion.
             await MainActor.run {
+                UIPasteboard.general.string = full
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
         }
@@ -178,25 +187,21 @@ private enum LiveActivityController {
 
     static func update(elapsedSeconds: Int, isRecording: Bool, isOverSoftLimit: Bool) async {
         guard let activity = Activity<TranscriptionActivityAttributes>.activities.first else { return }
-
         let state = TranscriptionActivityAttributes.ContentState(
             elapsedSeconds: elapsedSeconds,
             isRecording: isRecording,
             isOverSoftLimit: isOverSoftLimit
         )
-
         await activity.update(.init(state: state, staleDate: nil))
     }
 
     static func end(elapsedSeconds: Int, isRecording: Bool, isOverSoftLimit: Bool) async {
         guard let activity = Activity<TranscriptionActivityAttributes>.activities.first else { return }
-
         let state = TranscriptionActivityAttributes.ContentState(
             elapsedSeconds: elapsedSeconds,
             isRecording: isRecording,
             isOverSoftLimit: isOverSoftLimit
         )
-
         await activity.end(
             .init(state: state, staleDate: nil),
             dismissalPolicy: .immediate

@@ -6,3 +6,6 @@ extensions:
   - product: iMoonshineWidget
     bundleID: com.foobisdweik.iMoonshine.widget
     infoPath: WidgetInfo.plist
+  - product: iMoonshineIntents
+    bundleID: com.foobisdweik.iMoonshine.intents
+    infoPath: Sources/iMoonshineIntents/IntentsInfo.plist

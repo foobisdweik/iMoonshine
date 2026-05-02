@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import AppIntents
+import iMoonshineCore
 
 @main
 struct iMoonshineApp: App {
@@ -16,8 +17,7 @@ struct iMoonshineApp: App {
             .onChange(of: scenePhase) { _, newPhase in
                 Task {
                     switch newPhase {
-                    case .background: await RecordingState.shared.unload()
-                    case .active:     await RecordingState.shared.preload()
+                    case .active: await RecordingState.shared.preload()
                     default: break
                     }
                 }
