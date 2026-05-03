@@ -8,3 +8,5 @@ DerivedData/
 .netrc
 *.log
 /xtool
+*.ort
+*.bin

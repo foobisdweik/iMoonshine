@@ -1,42 +1,0 @@
-warning: 'imoonshine': found 1 file(s) which are unhandled; explicitly declare them as resources or exclude from the target
-    /home/omen/iMoonshine/Sources/iMoonshineIntents/IntentsInfo.plist
-[0/1] Planning build
-Building for debugging...
-[0/8] Write swift-version--4F0166CAD5E50BE9.txt
-[1/8] Write sources
-[3/10] Compiling iMoonshineCore ToggleRecordingIntent.swift
-[4/10] Emitting module iMoonshineCore
-[5/15] Emitting module iMoonshineIntents
-[6/15] Emitting module iMoonshineWidget
-[6/15] Compiling iMoonshineIntents-Extension stub.c
-[7/15] Write Objects.LinkFileList
-[8/15] Compiling iMoonshineWidget-Extension stub.c
-[9/15] Write Objects.LinkFileList
-[11/15] Emitting module iMoonshine
-[11/16] Compiling iMoonshine-App stub.c
-[12/16] Write Objects.LinkFileList
-[13/16] Linking iMoonshineIntents-Extension
-[14/16] Linking iMoonshineWidget-Extension
-[15/16] Linking iMoonshine-App
-Build complete! (1.25s)
-note: appintentsmetadataprocessor not found; using xtool-appintents-gen (Linux-native fallback) to produce Metadata.appintents/ for module iMoonshineIntents. Output covers the common AppIntent / AppShortcut surface but does not match Xcode byte-for-byte. Set XTOOL_APPINTENTS_PROCESSOR=/path/to/appintentsmetadataprocessor for byte-identical output.
-note: appintentsmetadataprocessor not found; using xtool-appintents-gen (Linux-native fallback) to produce Metadata.appintents/ for module iMoonshineWidget. Output covers the common AppIntent / AppShortcut surface but does not match Xcode byte-for-byte. Set XTOOL_APPINTENTS_PROCESSOR=/path/to/appintentsmetadataprocessor for byte-identical output.
-Planning...
-Waiting for device to be connected...
-Installing to device: iPhone (udid: 00008140-001A59492E51801C)
-
-[Unpacking app] ...[Unpacking app] 100%
-[Preparing device]   0%[Preparing device]  50%[Preparing device] 100%
-[Provisioning]   0%[Provisioning]  33%[Provisioning]  66%[Provisioning] 100%Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine.widget
-Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine
-Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine.intents
-
-[Signing]   0%[Signing][Signing] 100%
-[Packaging] ...[Packaging] 100%
-[Connecting]   0%[Connecting]  33%[Connecting]  66%[Connecting]  83%[Connecting] 100%
-[Installing]   0%[Installing]   1%[Installing]   2%[Installing]   3%[Installing]   4%[Installing]   5%[Installing]   6%[Installing]   7%[Installing]   8%[Installing]   9%[Installing]  10%[Installing]  11%[Installing]  12%[Installing]  13%[Installing]  14%[Installing]  15%[Installing]  16%[Installing]  17%[Installing]  18%[Installing]  19%[Installing]  20%[Installing]  21%[Installing]  22%[Installing]  23%[Installing]  24%[Installing]  25%[Installing]  26%[Installing]  27%[Installing]  28%[Installing]  29%[Installing]  30%[Installing]  31%[Installing]  32%[Installing]  33%[Installing]  34%[Installing]  35%[Installing]  36%[Installing]  37%[Installing]  38%[Installing]  39%[Installing]  40%[Installing]  41%[Installing]  42%[Installing]  43%[Installing]  44%[Installing]  45%[Installing]  46%[Installing]  47%[Installing]  48%[Installing]  49%[Installing]  50%[Installing]  51%[Installing]  52%[Installing]  53%[Installing]  54%[Installing]  55%[Installing]  56%[Installing]  57%[Installing]  58%[Installing]  59%[Installing]  60%[Installing]  61%[Installing]  62%[Installing]  63%[Installing]  64%[Installing]  65%[Installing]  66%[Installing]  67%[Installing]  68%[Installing]  69%[Installing]  70%[Installing]  71%[Installing]  72%[Installing]  73%[Installing]  74%[Installing]  75%[Installing]  76%[Installing]  77%[Installing]  78%[Installing]  79%[Installing]  80%[Installing]  81%[Installing]  82%[Installing]  83%[Installing]  84%[Installing]  85%[Installing]  86%[Installing]  87%[Installing]  88%[Installing]  89%[Installing]  90%[Installing]  91%[Installing]  92%[Installing]  93%[Installing]  94%[Installing]  95%[Installing]  96%[Installing]  97%[Installing]  98%[Installing]  99%[Installing] 100%
-[Verifying]   0%[Verifying]  90%[Verifying] 100%2026-05-03 06:18:07 Ubuntu pymobiledevice3.__main__[234724] ERROR Device is not connected
-
-Installation successful. Launching XTL-T7WW7538GC.com.foobisdweik.iMoonshine...
-Launching XTL-T7WW7538GC.com.foobisdweik.iMoonshine via pymobiledevice3...
-
