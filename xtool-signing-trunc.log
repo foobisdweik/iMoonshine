@@ -1,0 +1,7 @@
+15:note: appintentsmetadataprocessor not found; using xtool-appintents-gen (Linux-native fallback) to produce Metadata.appintents/ for module iMoonshineIntents. Output covers the common AppIntent / AppShortcut surface but does not match Xcode byte-for-byte. Set XTOOL_APPINTENTS_PROCESSOR=/path/to/appintentsmetadataprocessor for byte-identical output.
+22:[Provisioning]   0%[Provisioning]  33%[Provisioning]  66%[Provisioning] 100%Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine
+23:Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine.widget
+24:Updated Metadata.appintents/extract.actionsdata with signed bundle ID: XTL-T7WW7538GC.com.foobisdweik.iMoonshine.intents
+26:[Signing]   0%[Signing][Signing] 100%
+33:ModuleNotFoundError: No module named 'pymobiledevice3'
+38:Error: exit(1)

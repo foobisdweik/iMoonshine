@@ -6,7 +6,7 @@ import plistlib
 import sys
 import zipfile
 from dataclasses import dataclass
-from typing import Iterable
+from typing import Any, Iterable
 
 
 METADATA_SUFFIXES = (
@@ -22,6 +22,7 @@ class AuditResult:
     app_infos: list[dict]
     metadata_files: list[str]
     nlu_files: list[str]
+    metadata_summaries: list[dict]
 
 
 def _read_plist_from_zip(archive: zipfile.ZipFile, name: str) -> dict | None:
@@ -38,6 +39,95 @@ def _read_plist_from_disk(path: str) -> dict | None:
             return plistlib.load(fh)
     except Exception:
         return None
+
+
+def _read_actionsdata(raw: bytes) -> dict | None:
+    try:
+        loaded = json.loads(raw.decode("utf-8"))
+        return loaded if isinstance(loaded, dict) else None
+    except Exception:
+        pass
+    try:
+        loaded = plistlib.loads(raw)
+        return loaded if isinstance(loaded, dict) else None
+    except Exception:
+        return None
+
+
+def _read_actionsdata_from_zip(archive: zipfile.ZipFile, name: str) -> dict | None:
+    try:
+        with archive.open(name) as fh:
+            return _read_actionsdata(fh.read())
+    except Exception:
+        return None
+
+
+def _read_actionsdata_from_disk(path: str) -> dict | None:
+    try:
+        with open(path, "rb") as fh:
+            return _read_actionsdata(fh.read())
+    except Exception:
+        return None
+
+
+def _scalar_or_len(value: Any) -> Any:
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, list):
+        return {"count": len(value), "items": value if len(value) <= 8 else value[:8]}
+    if isinstance(value, dict):
+        return {"count": len(value), "keys": sorted(value.keys())[:12]}
+    return str(value)
+
+
+def _summarize_actionsdata(path: str, data: dict | None) -> dict:
+    if not data:
+        return {"path": path, "error": "unreadable"}
+
+    actions = data.get("actions")
+    action_summaries = {}
+    if isinstance(actions, dict):
+        for identifier, action in sorted(actions.items()):
+            if not isinstance(action, dict):
+                action_summaries[identifier] = {"error": "non-dict action"}
+                continue
+            interesting_keys = (
+                "identifier",
+                "fullyQualifiedTypeName",
+                "mangledTypeName",
+                "mangledTypeNameV2",
+                "mangledTypeNameByBundleIdentifier",
+                "mangledTypeNameByBundleIdentifierV2",
+                "effectiveBundleIdentifiers",
+                "openAppWhenRun",
+                "isDiscoverable",
+                "supportedModes",
+                "outputFlags",
+                "systemProtocols",
+                "systemProtocolMetadata",
+                "systemProtocolMetadataV2",
+                "typeSpecificMetadata",
+                "parameters",
+            )
+            action_summaries[identifier] = {
+                key: _scalar_or_len(action.get(key))
+                for key in interesting_keys
+                if key in action
+            }
+
+    summary = {
+        "path": path,
+        "topLevelKeys": sorted(data.keys()),
+        "generator": data.get("generator"),
+        "bundleIdentifier": data.get("bundleIdentifier"),
+        "autoShortcutProviderMangledName": data.get("autoShortcutProviderMangledName"),
+        "packages": _scalar_or_len(data.get("packages")),
+        "actions": action_summaries,
+    }
+    for key in ("autoShortcuts", "assistantIntents", "assistantEntities", "queries", "entities", "enums"):
+        if key in data:
+            summary[key] = _scalar_or_len(data.get(key))
+    return summary
 
 
 def _summarize_info(path: str, info: dict | None) -> dict:
@@ -77,9 +167,14 @@ def audit_ipa(path: str) -> AuditResult:
             _summarize_info(name, _read_plist_from_zip(archive, name))
             for name in sorted(info_paths)
         ]
-        metadata_files = [
+        metadata_files = sorted([
             name for name in names
             if any(name.endswith(suffix) for suffix in METADATA_SUFFIXES)
+        ])
+        metadata_summaries = [
+            _summarize_actionsdata(name, _read_actionsdata_from_zip(archive, name))
+            for name in metadata_files
+            if name.endswith("extract.actionsdata")
         ]
         nlu_files = [name for name in names if "/nlu.appintents/" in name]
     return AuditResult(
@@ -88,6 +183,7 @@ def audit_ipa(path: str) -> AuditResult:
         app_infos=app_infos,
         metadata_files=metadata_files,
         nlu_files=nlu_files,
+        metadata_summaries=metadata_summaries,
     )
 
 
@@ -111,12 +207,18 @@ def audit_app(path: str) -> AuditResult:
         _summarize_info(rel_path, _read_plist_from_disk(os.path.join(path, rel_path)))
         for rel_path in sorted(info_paths)
     ]
+    metadata_summaries = [
+        _summarize_actionsdata(rel_path, _read_actionsdata_from_disk(os.path.join(path, rel_path)))
+        for rel_path in sorted(metadata_files)
+        if rel_path.endswith("extract.actionsdata")
+    ]
     return AuditResult(
         target=path,
         kind="app",
         app_infos=app_infos,
         metadata_files=sorted(metadata_files),
         nlu_files=sorted(nlu_files),
+        metadata_summaries=metadata_summaries,
     )
 
 
@@ -149,6 +251,19 @@ def print_human(results: Iterable[AuditResult]) -> None:
         if result.nlu_files:
             for name in result.nlu_files:
                 print(f"  - {name}")
+        else:
+            print("  - <none>")
+        print("Metadata.appintents action summary:")
+        if result.metadata_summaries:
+            for summary in result.metadata_summaries:
+                print(f"  - {summary['path']}")
+                for key in ("generator", "bundleIdentifier", "autoShortcutProviderMangledName", "packages"):
+                    if key in summary and summary[key] is not None:
+                        print(f"    {key}: {summary[key]}")
+                for identifier, action in summary.get("actions", {}).items():
+                    print(f"    action: {identifier}")
+                    for key, value in action.items():
+                        print(f"      {key}: {value}")
         else:
             print("  - <none>")
         print()

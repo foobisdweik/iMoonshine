@@ -21,17 +21,13 @@ let package = Package(
             name: "iMoonshineWidget",
             targets: ["iMoonshineWidget"]
         ),
-        .library(
-            name: "iMoonshineIntents",
-            targets: ["iMoonshineIntents"]
-        ),
     ],
     dependencies: [
-        .package(url: "https://github.com/moonshine-ai/moonshine-swift.git", from: "0.0.56"),
+        .package(path: "Vendor/moonshine-swift"),
     ],
     targets: [
-        // Shared library: intents, activity attributes, recording state.
-        // Imported by the main app, widget extension, and intents extension.
+        // Shared library: activity attributes and recording state.
+        // Imported by the main app and widget extension.
         .target(
             name: "iMoonshineCore",
             dependencies: [
@@ -56,12 +52,6 @@ let package = Package(
             name: "iMoonshineWidget",
             dependencies: ["iMoonshineCore"],
             path: "Sources/iMoonshineWidget"
-        ),
-        // AppIntents extension target — thin entry point, imports iMoonshineCore.
-        .target(
-            name: "iMoonshineIntents",
-            dependencies: ["iMoonshineCore"],
-            path: "Sources/iMoonshineIntents"
         ),
     ]
 )

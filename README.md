@@ -40,9 +40,12 @@ to clipboard from background. So the intent exports the string via
    starts and stops recording.
 4. If no iMoonshine action appears yet, close Shortcuts, open iMoonshine
    once more, then search again.
-5. Add action below: search "Clipboard" → select **"Copy to Clipboard"**.
-   Output from the iMoonshine step should auto-wire as input.
-6. Open **Settings → Action Button → Shortcut** → pick the Shortcut.
+5. Add **If** below the iMoonshine action. Set it to:
+   **If [iMoonshine action output] has any value**.
+6. Inside that If block, add **Copy to Clipboard**. Tap its **Content**
+   field and choose the iMoonshine action's output magic variable. Do not
+   leave the gray **Content** placeholder selected.
+7. Open **Settings → Action Button → Shortcut** → pick the Shortcut.
 
 Done. Two presses + paste from now on.
 

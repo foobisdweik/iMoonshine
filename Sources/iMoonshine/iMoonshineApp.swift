@@ -30,10 +30,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        AVAudioApplication.requestRecordPermission { granted in
-            print("[VTC] mic permission granted=\(granted)")
+        if application.applicationState == .active {
+            AVAudioApplication.requestRecordPermission { granted in
+                print("[VTC] mic permission granted=\(granted)")
+            }
+            Task { await RecordingState.shared.preload() }
         }
-        Task { await RecordingState.shared.preload() }
         return true
     }
 }

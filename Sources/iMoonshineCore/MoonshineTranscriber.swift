@@ -1,5 +1,8 @@
 import Foundation
 import MoonshineVoice
+import os
+
+private let log = Logger(subsystem: "com.foobisdweik.iMoonshine", category: "MoonshineTranscriber")
 
 /// Wraps `MicTranscriber`. Resolves bundled model path, bridges SDK events
 /// to an app-local enum so the UI layer stays SDK-agnostic.
@@ -61,9 +64,11 @@ final class MoonshineTranscriber: @unchecked Sendable {
         guard mic == nil else { return }
         guard let path = resolveModelPath() else {
             print("[VTC] model folder '\(Self.modelFolderName)' not found in bundle")
+            log.error("model folder \(Self.modelFolderName, privacy: .public) not found in bundle")
             return
         }
         do {
+            log.notice("moonshine load begin path=\(path, privacy: .public)")
             let m = try MicTranscriber(
                 modelPath: path,
                 modelArch: Self.modelArch,
@@ -73,8 +78,10 @@ final class MoonshineTranscriber: @unchecked Sendable {
             m.addListener(listener)
             mic = m
             print("[VTC] moonshine loaded (\(Self.modelFolderName)) from \(path)")
+            log.notice("moonshine loaded model=\(Self.modelFolderName, privacy: .public)")
         } catch {
             print("[VTC] moonshine load failed: \(error)")
+            log.error("moonshine load failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -82,6 +89,7 @@ final class MoonshineTranscriber: @unchecked Sendable {
         mic?.close()
         mic = nil
         print("[VTC] moonshine unloaded")
+        log.notice("moonshine unloaded")
     }
 
     // MARK: - Recording
@@ -89,16 +97,33 @@ final class MoonshineTranscriber: @unchecked Sendable {
     func start() async throws {
         if mic == nil { loadIfNeeded() }
         guard let mic else { throw TranscriberError.notLoaded }
-        try mic.start()
+        log.notice("mic start begin")
+        do {
+            try mic.start()
+            log.notice("mic start ok")
+        } catch {
+            log.error("mic start failed: \(String(describing: error), privacy: .public)")
+            throw error
+        }
     }
 
     func stop() throws {
-        try mic?.stop()
+        log.notice("mic stop begin")
+        do {
+            try mic?.stop()
+            log.notice("mic stop ok")
+        } catch {
+            log.error("mic stop failed: \(String(describing: error), privacy: .public)")
+            throw error
+        }
     }
 
     // MARK: - Emit
 
     fileprivate func emit(_ event: Event) {
+        if case .failure(let message) = event {
+            log.error("transcriber event failure: \(message, privacy: .public)")
+        }
         eventSink?(event)
     }
 

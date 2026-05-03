@@ -1,7 +1,10 @@
 import ActivityKit
 import AVFoundation
 import Foundation
+import os
 import UIKit
+
+private let log = Logger(subsystem: "com.foobisdweik.iMoonshine", category: "Recording")
 
 public actor RecordingState {
 
@@ -41,20 +44,44 @@ public actor RecordingState {
     /// clipboard bypass). Returns current clipboard on start to avoid wiping it.
     @discardableResult
     public func toggle() async throws -> String {
+        print("[VTC] RecordingState.toggle isRecording=\(isRecording) pid=\(ProcessInfo.processInfo.processIdentifier) bundle=\(Bundle.main.bundleIdentifier ?? "<nil>")")
+        log.notice("toggle isRecording=\(self.isRecording, privacy: .public) pid=\(ProcessInfo.processInfo.processIdentifier, privacy: .public) bundle=\(Bundle.main.bundleIdentifier ?? "<nil>", privacy: .public)")
         if isRecording {
             return try await stop()
         } else {
             try await start()
-            // Return current clipboard so Shortcuts "Copy to clipboard" node
-            // effectively does nothing when we are just starting.
-            return await MainActor.run { UIPasteboard.general.string ?? "" }
+            // Avoid touching UIPasteboard while the app is background-launched
+            // for an intent; iOS may terminate background pasteboard access.
+            return await MainActor.run {
+                UIApplication.shared.applicationState == .active
+                    ? UIPasteboard.general.string ?? ""
+                    : ""
+            }
         }
     }
 
     private func start() async throws {
+        print("[VTC] RecordingState.start begin")
+        log.notice("start begin")
         completedLines.removeAll()
         activeLines.removeAll()
         recordingStartTime = Date()
+
+        let permission = AVAudioSession.sharedInstance().recordPermission
+        let appState = await MainActor.run { UIApplication.shared.applicationState.rawValue }
+        log.notice("start preflight appState=\(appState, privacy: .public) micPermission=\(String(describing: permission), privacy: .public)")
+        guard permission == .granted else {
+            log.error("microphone permission not granted")
+            throw RecordingPermissionError.microphoneNotGranted
+        }
+
+        // AudioRecordingIntent requires a Live Activity for an active
+        // background audio session. Start it before activating AVAudioSession;
+        // otherwise AppIntents traps after perform() returns.
+        print("[VTC] RecordingState.start liveActivity start")
+        log.notice("start liveActivity begin")
+        try await LiveActivityController.start()
+        log.notice("start liveActivity ok")
 
         // Configure audio session for background recording.
         // .record (not .playAndRecord) — mic only, no playback path.
@@ -62,21 +89,27 @@ public actor RecordingState {
         // BG-Active state; without it, audiomxd denies setActive(true) with
         // -12985 ("Cannot interrupt others") when other audio is active.
         let session = AVAudioSession.sharedInstance()
+        print("[VTC] RecordingState.start setCategory")
+        log.notice("start setCategory")
         try session.setCategory(.record, mode: .default, options: [.allowBluetooth, .mixWithOthers])
-        try session.setActive(true)
-
-        // LiveActivity must be active BEFORE AudioRecordingIntent considers
-        // the background audio session valid on iOS 18+.
-        await LiveActivityController.start()
+        print("[VTC] RecordingState.start audio configured")
+        log.notice("start audio configured")
 
         do {
+            print("[VTC] RecordingState.start transcriber start")
+            log.notice("start transcriber begin")
             try await transcriber.start()
         } catch {
+            print("[VTC] RecordingState.start transcriber failed: \(error)")
+            log.error("start transcriber failed: \(String(describing: error), privacy: .public)")
             recordingStartTime = nil
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
             await endLiveActivity()
             throw error
         }
         isRecording = true
+        print("[VTC] RecordingState.start complete")
+        log.notice("start complete")
 
         // Periodic timer to update Dynamic Island elapsed seconds.
         timerTask = Task { [weak self] in
@@ -88,10 +121,17 @@ public actor RecordingState {
     }
 
     private func stop() async throws -> String {
+        print("[VTC] RecordingState.stop begin")
+        log.notice("stop begin")
         timerTask?.cancel()
         timerTask = nil
 
         try transcriber.stop()
+        print("[VTC] RecordingState.stop transcriber stopped")
+        log.notice("stop transcriber stopped")
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        print("[VTC] RecordingState.stop audio inactive")
+        log.notice("stop audio inactive")
         isRecording = false
 
         let partialLines = activeLines
@@ -109,12 +149,17 @@ public actor RecordingState {
         if let vm = uiDelegate, !full.isEmpty {
             await MainActor.run { vm.didCopyToClipboard(full) }
         } else if !full.isEmpty {
-            await MainActor.run {
-                UIPasteboard.general.string = full
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            let canWritePasteboard = await MainActor.run { UIApplication.shared.applicationState == .active }
+            if canWritePasteboard {
+                await MainActor.run {
+                    UIPasteboard.general.string = full
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
             }
         }
 
+        print("[VTC] RecordingState.stop complete transcriptLength=\(full.count)")
+        log.notice("stop complete transcriptLength=\(full.count, privacy: .public)")
         return full
     }
 
@@ -160,10 +205,11 @@ public actor RecordingState {
 }
 
 private enum LiveActivityController {
-    static func start() async {
+    static func start() async throws {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
             print("[VTC] Live Activities not enabled")
-            return
+            log.error("Live Activities not enabled")
+            throw LiveActivityError.notAuthorized
         }
 
         let attributes = TranscriptionActivityAttributes()
@@ -180,8 +226,11 @@ private enum LiveActivityController {
                 pushType: nil
             )
             print("[VTC] LiveActivity started")
+            log.notice("LiveActivity started")
         } catch {
             print("[VTC] LiveActivity failed: \(error)")
+            log.error("LiveActivity failed: \(String(describing: error), privacy: .public)")
+            throw error
         }
     }
 
@@ -207,5 +256,22 @@ private enum LiveActivityController {
             dismissalPolicy: .immediate
         )
         print("[VTC] LiveActivity ended")
+        log.notice("LiveActivity ended")
+    }
+}
+
+private enum LiveActivityError: LocalizedError {
+    case notAuthorized
+
+    var errorDescription: String? {
+        "Live Activities are not enabled for iMoonshine."
+    }
+}
+
+private enum RecordingPermissionError: LocalizedError {
+    case microphoneNotGranted
+
+    var errorDescription: String? {
+        "Open iMoonshine once and allow microphone access."
     }
 }

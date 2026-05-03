@@ -1,0 +1,223 @@
+# memvid_get.log
+
+Generated: 2026-05-03
+Agent: codex
+Current repo: /home/omen/iMoonshine
+Target context repo also requested: /home/omen/xtool-ubuntu-25.10
+
+## Caveman-ultra summary
+
+Me ask Memvid for repo brain.
+Memvid first give mostly global rules brain.
+Repo-specific brain only appear after me shout exact repo words and allow legacy/other project records.
+
+This is not total failure. It is context recall being too generic on first pass.
+
+## Rules followed
+
+- Read /home/omen/iMoonshine/AGENTS.md.
+- Read /home/omen/xtool-ubuntu-25.10/AGENTS.md.
+- Read canonical protocol at /home/omen/ultimate-memvid/memvid/AGENTS.md.
+- Used memvid-context only for read-side recall.
+- Did not open .mv2 files directly.
+- Did not touch /var/lib/memvid/store, processing, ingest, done, failed.
+- Wrote completion memory only through /var/lib/memvid/queue with temp file then atomic rename.
+
+## First problem: normal shell sandbox broke before useful work
+
+Initial ordinary shell reads failed before commands ran:
+
+```text
+thread 'main' (...) panicked at linux-sandbox/src/linux_run_main.rs:1210:13:
+failed to open synthetic bubblewrap mount registry lock /tmp/codex-bwrap-synthetic-mount-targets/lock: Permission denied (os error 13)
+```
+
+Impact:
+
+- Basic reads like sed/rg failed inside sandbox.
+- Had to rerun with escalated permissions.
+- This is probably Codex sandbox/bubblewrap state, not Memvid itself.
+- Still worth backend knowing because it made context retrieval look flaky from agent side.
+
+Backend check:
+
+- Inspect permissions/ownership on /tmp/codex-bwrap-synthetic-mount-targets and its lock.
+- Confirm whether stale lock dir was created by root or another namespace.
+- Confirm whether workspace-write sandbox should be able to read that lock.
+
+## Second problem: initial memvid-context pass returned generic global context
+
+Command shape used:
+
+```bash
+memvid-context --project iMoonshine --cwd /home/omen/iMoonshine --agent codex --budget-tokens 5000 --max-records 40
+memvid-context --project xtool-ubuntu-25.10 --cwd /home/omen/xtool-ubuntu-25.10 --agent codex --budget-tokens 7000 --max-records 60
+```
+
+Observed packet metadata:
+
+```text
+stores_searched: 1
+store_dir: /var/lib/memvid/store
+compression_horizon: 7 days
+```
+
+Observed result:
+
+- Mostly global Memvid protocol records.
+- Records about protocol bootstrap, wrappers, aliases, context injector, installer, AutoFDO.
+- No useful iMoonshine App Intents/Shortcuts details on first pass.
+- No useful xtool AppIntentsGen details on first pass.
+
+Caveman read:
+
+Memvid hear project name, but answer with global law book.
+Need project hunt first, global law second.
+
+Backend check:
+
+- Scoring may still overweight project=global records.
+- Current project records migrated as project=legacy may not be treated as valid project matches.
+- Source records from old stores include project in body/caption, but top-level migrated project often appears as legacy/unknown.
+- If migrated records have project=legacy, project filtering/scoring needs to inspect embedded source project fields too.
+- "stores_searched: 1" may be expected after migration into one daily store, but backend should verify older daily stores are not silently skipped when present.
+
+## Third problem: repo context required include-other-projects plus exact query terms
+
+Narrow commands that finally surfaced useful context:
+
+```bash
+memvid-context --project iMoonshine --cwd /home/omen/iMoonshine --agent codex --query iMoonshine --query "App Intents" --query xtool --include-other-projects --budget-tokens 9000 --max-records 80
+memvid-context --project xtool-ubuntu-25.10 --cwd /home/omen/xtool-ubuntu-25.10 --agent codex --query xtool-ubuntu-25.10 --query xtool --query ubuntu --include-other-projects --budget-tokens 9000 --max-records 80
+```
+
+Useful context appeared only here.
+
+Examples surfaced:
+
+- iMoonshine App Intents metadata missing from packaged app.
+- Shortcuts picker and linkd issues.
+- xtool Linux-native AppIntentsGen work.
+- AutoSigner JSON metadata patching.
+- Wispr reference JSON schema work.
+- iMoonshineCore / iMoonshineIntents.appex split.
+- Metadata.appintents and nlu.appintents packaging.
+- packages array missing from extract.actionsdata.
+
+Caveman read:
+
+Good rocks are in cave.
+Door label wrong.
+Need secret words and allow legacy cave.
+
+Backend check:
+
+- Migrated records from /home/omen/memvid/iMoonshine.mv2 and /home/omen/memvid/xtool-ubuntu-25.10.mv2 are being emitted as project=legacy or project=unknown.
+- Project identity is present inside text like `[project:iMoonshine]` or source_file, but not always in the top-level searchable project field.
+- memvid-context default filtering excludes unrelated legacy projects unless --include-other-projects is used.
+- That means correct project context can be hidden by default even when the source clearly belongs to the requested project.
+
+## Fourth problem: project naming drift hurts recall
+
+Observed variants:
+
+- iMoonshine
+- xtool-ubuntu-25.10
+- xtool-ubuntu-25-10
+- legacy
+- unknown
+- global
+
+Impact:
+
+- Asking for xtool-ubuntu-25.10 may miss records tagged xtool-ubuntu-25-10.
+- Asking for iMoonshine may miss records tagged legacy with iMoonshine only in body text.
+- Asking without --include-other-projects may drop the actual useful records.
+
+Backend check:
+
+- Normalize project aliases during migration and query.
+- Treat dash/dot variants as aliases for this project.
+- Preserve original project tag from legacy frames as first-class project metadata, not only body text.
+- Consider source_file names like iMoonshine.mv2 and xtool-ubuntu-25.10.mv2 as strong project hints.
+
+## Fifth problem: global protocol records are useful but too dominant
+
+Global context is important:
+
+- Do not write .mv2.
+- Do not inspect backend store.
+- Use queue for durable writes.
+- Use memvid-context for read-side recall.
+
+But after those rules are present, the next records should be project-specific.
+
+Observed behavior:
+
+- Global records took most first-pass budget.
+- Repo records appeared only after explicit semantic query and include-other-projects.
+
+Backend check:
+
+- Reserve a small fixed budget for global operating rules.
+- Reserve remaining budget for current project and strong project aliases.
+- De-duplicate repeated global bootstrap records across queries.
+- Consider rendering "Operating Rules" once, then suppress matching global protocol records unless query explicitly asks for Memvid protocol.
+
+## Sixth problem: interruptions made command history noisy
+
+User intentionally interrupted earlier attempts.
+
+Impact:
+
+- Some memvid-context --help attempts were aborted.
+- This is not backend failure.
+- But the visible agent log contains aborted commands mixed with real retrieval issues.
+
+Backend check:
+
+- Ignore aborted command attempts when diagnosing Memvid recall quality.
+- Focus on completed memvid-context outputs.
+
+## What worked
+
+- memvid-context binary exists and prints help.
+- memvid-context returns bounded Markdown packets.
+- Read-only recall path works.
+- Narrow explicit queries do find relevant migrated project records.
+- Queue write completed:
+
+```text
+/var/lib/memvid/queue/3e89694d-00e3-4e22-90e6-7b1ce086ccc1.md
+```
+
+## Main backend ask
+
+Make first-pass startup recall for a project return project brain without needing:
+
+- --include-other-projects
+- multiple exact query words
+- knowledge that useful records are hidden under legacy/unknown
+
+Expected behavior:
+
+```bash
+memvid-context --project xtool-ubuntu-25.10 --cwd /home/omen/xtool-ubuntu-25.10
+```
+
+Should return xtool AppIntentsGen / Ubuntu 25.10 / AppIntents metadata context before generic global installer/autofdo context.
+
+```bash
+memvid-context --project iMoonshine --cwd /home/omen/iMoonshine
+```
+
+Should return iMoonshine Action Button / Shortcuts / App Intents metadata context before generic global installer/autofdo context.
+
+## Likely root cause
+
+Project metadata from migrated legacy frames is not being promoted strongly enough into the searchable/project-match layer.
+
+Result:
+
+Memvid has the right memories.
+Default recall ranking/filtering does not reliably hand them to agent.

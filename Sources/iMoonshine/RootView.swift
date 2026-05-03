@@ -126,7 +126,7 @@ struct RootView: View {
                         stepView(number: "3", title: "Find iMoonshine Action",
                                  detail: "Tap \"Add Action\". Search for \"iMoonshine\". Pick the iMoonshine action that starts and stops recording. If nothing appears yet, leave Shortcuts, open iMoonshine once more, then search again.")
                         stepView(number: "4", title: "Add Clipboard Action",
-                                 detail: "Tap + below the first action. Search for \"Clipboard\". Select \"Copy to Clipboard\". It should wire automatically to the iMoonshine output.")
+                                 detail: "Tap + below the first action. Add an If block for when the iMoonshine output has any value. Inside it, add Copy to Clipboard and set Content to the iMoonshine output magic variable.")
                         stepView(number: "5", title: "Assign to Action Button",
                                  detail: "Open Settings → Action Button → Shortcut. Pick the Shortcut you created.")
                     }

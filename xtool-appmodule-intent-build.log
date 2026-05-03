@@ -1,0 +1,37 @@
+[0/1] Planning build
+Building for debugging...
+[0/10] Write sources
+[2/10] Write swift-version--4F0166CAD5E50BE9.txt
+[4/15] Compiling iMoonshineCore RecordingUIDelegate.swift
+[5/15] Compiling iMoonshineCore TranscriptionActivityAttributes.swift
+[6/15] Compiling iMoonshineCore resource_bundle_accessor.swift
+[7/15] Compiling iMoonshineCore MoonshineTranscriber.swift
+[8/15] Compiling iMoonshineCore RecordingState.swift
+/home/omen/iMoonshine/Sources/iMoonshineCore/RecordingState.swift:72:69: warning: 'allowBluetooth' was deprecated in iOS 8.0: renamed to 'AVAudioSession.CategoryOptions.allowBluetoothHFP' [#DeprecatedDeclaration]
+ 70 |         let session = AVAudioSession.sharedInstance()
+ 71 |         print("[VTC] RecordingState.start setCategory")
+ 72 |         try session.setCategory(.record, mode: .default, options: [.allowBluetooth, .mixWithOthers])
+    |                                                                     |- warning: 'allowBluetooth' was deprecated in iOS 8.0: renamed to 'AVAudioSession.CategoryOptions.allowBluetoothHFP' [#DeprecatedDeclaration]
+    |                                                                     `- note: use 'AVAudioSession.CategoryOptions.allowBluetoothHFP' instead
+ 73 |         print("[VTC] RecordingState.start setActive")
+ 74 |         try session.setActive(true)
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+[9/15] Emitting module iMoonshineCore
+[10/22] Compiling iMoonshineWidget TranscriptionWidget.swift
+[11/22] Emitting module iMoonshineWidget
+[11/22] Compiling iMoonshineWidget-Extension stub.c
+[12/22] Write Objects.LinkFileList
+[14/22] Compiling iMoonshine RootView.swift
+[15/22] Compiling iMoonshine RecordingViewModel.swift
+[16/22] Emitting module iMoonshine
+[17/22] Compiling iMoonshine ToggleRecordingIntent.swift
+[18/22] Compiling iMoonshine iMoonshineApp.swift
+[18/22] Compiling iMoonshine-App stub.c
+[19/22] Write Objects.LinkFileList
+[20/22] Linking iMoonshineWidget-Extension
+[21/22] Linking iMoonshine-App
+Build complete! (1.88s)
+note: appintentsmetadataprocessor not found; using xtool-appintents-gen (Linux-native fallback) to produce Metadata.appintents/ for module iMoonshine. Output covers the common AppIntent / AppShortcut surface but does not match Xcode byte-for-byte. Set XTOOL_APPINTENTS_PROCESSOR=/path/to/appintentsmetadataprocessor for byte-identical output.
+Planning...
+Wrote to /home/omen/iMoonshine/xtool/iMoonshine.app

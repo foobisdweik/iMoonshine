@@ -1,140 +1,116 @@
-# Universal Agent Instructions (Local-First Protocol)
+# Universal Agent Instructions
 
-Canonical version lives at the user's global config (`~/.claude/CLAUDE.md` on Linux/WSL, `%USERPROFILE%\.claude\CLAUDE.md` on Windows). This file contains project-specific deltas for the **fully local, GPU-accelerated Memvid setup**.
+## Memvid Queue Protocol
 
----
+Agents use Memvid as the shared long-term memory backend. The only write interface is the queue directory. Agents must not invoke a memvid binary, inspect backend working directories, or touch `.mv2` files directly.
 
-## 1. Session Start Checklist (run in order, every session)
+## Startup Recall
 
-1. Resolve `MEMVID_DIR` from the platform table in §8.
-2. `memvid find "$MEMVID_DIR/global_memory.mv2" --query "<task or project name>" --mode sem --top-k 5`
-3. `memvid find "$MEMVID_DIR/memvid.mv2" --query "<task>" --mode sem --top-k 5`
-4. If project memory missing: `memvid create "$MEMVID_DIR/memvid.mv2"`
-5. Detect own agent identity from §6 table; use that tag for all writes this session.
-6. Summarize recalled context to user in one sentence (caveman style).
+Agent sessions should be launched through a Memvid wrapper so a bounded startup context packet is injected before normal work begins.
 
-If any `memvid` command errors, follow §9 fail-safe — do not abort the user's task.
+- Codex wrapper: `codex-memvid`
+- Claude wrapper: `claude-memvid`
+- Gemini wrapper: `gemini-memvid`
+- Generic wrapper: `memvid-context-wrap -- <agent command>`
+- Context generator: `memvid-context`
 
----
+The context packet is a read-only, compressed view of backend-owned source-of-truth stores. It uses chrono-semantic compression: recent records are shown with more detail, and ordinary records reach maximum compression at 7 days old. Semantically critical facts, handoffs, risks, protocol rules, and project matches can survive longer, but still as compact facts.
 
-## 2. Write Command (canonical template)
+Agents may read the injected packet. Agents must not open `.mv2` files or backend directories to perform their own recall. If more recall is needed, ask the launcher/user for a narrower `memvid-context --query ...` packet instead of accessing the store directly.
 
-```bash
-echo "[agent:<NAME>] [project:memvid] [status:<STATE>] <full prose content>" \
-  | memvid put "$MEMVID_DIR/<target>.mv2" --embedding -m nomic --vector-compression
+Rotating source-of-truth stores live under `/var/lib/memvid/store/YYYY-MM-DD.mv2`. The injector handles daily rotation by scanning recent stores newest-first and returning source-attributed snippets. Agents do not need to know or manage store rotation.
+
+## Queue Contract
+
+- Queue path: `/var/lib/memvid/queue/`
+- Backend paths are reserved: `/var/lib/memvid/processing/`, `/var/lib/memvid/ingest/`, `/var/lib/memvid/done/`, `/var/lib/memvid/failed/`, `/var/lib/memvid/store/`
+- Write pure Markdown only.
+- Write atomically: create a hidden temp file in the queue, then rename it into place.
+- Use UUID filenames. Do not rely on timestamps alone for uniqueness.
+- Maximum queue file size: 256 KB unless the user explicitly overrides this for a specific migration or diagnostic task.
+- If the queue exceeds 10,000 files, slow write frequency and prefer a single handoff/update over many small files.
+- After a file is renamed into the queue, do not retry, edit, delete, or move it. The backend owns eventual processing or failure handling.
+
+## Metadata Header
+
+Every queued Markdown file starts with this header:
+
+```text
+[agent:<agent-name>]
+[status:in-progress|done|handing-off|error|migrated]
+[type:update|handoff|error|import]
+[project:<project-or-global>]
+[timestamp:<unix_ns>]
 ```
 
-Always include `--embedding -m nomic --vector-compression`. Never omit.
-Substitute placeholders literally. Resolve them from §6 / §3.
+Use the current project name when known. Use `global` for cross-project operating context.
 
-Trigger a write whenever any of these occur:
-* Significant decision made
-* Bug found or fixed
-* New file or function created
-* Task completed
-* Context risk of being lost (compaction, handoff, tool switch)
+## Standard Write
 
----
-
-## 3. Tag Vocabulary
-
-| Tag           | Allowed values                                                  |
-|---------------|-----------------------------------------------------------------|
-| `[agent:X]`   | `claude-code`, `claude-desktop`, `codex`, `gemini`, `gitlab-duo`|
-| `[project:X]` | `memvid` or `global`                                            |
-| `[status:X]`  | `in-progress`, `done`, `handing-off`, `blocked`, `irreconcilable` |
-| `[handoff]`   | optional flag, add when handing off mid-task                    |
-
----
-
-## 4. Communication Style (caveman) — Scope
-
-**ON** for: chat replies sent directly to the user.
-**OFF** for: code, code comments, docstrings, file contents, commit messages, PR descriptions, issue bodies, memvid frame contents, error message quotes, security warnings, destructive-action confirmations, multi-step ordered procedures.
-
-Rules when ON: drop articles, filler, pleasantries, hedging. Fragments fine. Short synonyms. Technical terms exact.
-
----
-
-## 5. Handoff Protocol (Local)
-
-On context-limit, tool switch, or planned pause:
-1. Write handoff record to `memvid.mv2` AND `global_memory.mv2`.
-2. Include the `[handoff]` flag plus `[status:handing-off]`.
-
-Template:
 ```bash
-echo "[agent:<NAME>] [project:memvid] [status:handing-off] [handoff]
-## Handoff — <YYYY-MM-DD>
+queue=/var/lib/memvid/queue
+tmp=$(mktemp "$queue/.tmp.XXXXXX")
+timestamp=$(date +%s%N)
+
+cat > "$tmp" <<EOF
+[agent:${AGENT_NAME:-agent}]
+[status:<STATE>]
+[type:update]
+[project:<PROJECT>]
+[timestamp:$timestamp]
+
+<concise prose or task output>
+EOF
+
+chmod 0644 "$tmp"
+mv "$tmp" "$queue/$(uuidgen).md"
+```
+
+## Mandatory Write Triggers
+
+Write to the queue when:
+
+- Significant decision made.
+- Bug found or fixed.
+- New file, function, command, or convention created.
+- Task completed.
+- Context risk appears: compaction, handoff, model switch, tool switch, or long pause.
+
+Keep entries concise and high signal. Do not dump large logs, dependency output, generated files, or broad file contents.
+
+## Handoff
+
+```bash
+queue=/var/lib/memvid/queue
+tmp=$(mktemp "$queue/.tmp.XXXXXX")
+timestamp=$(date +%s%N)
+
+cat > "$tmp" <<EOF
+[agent:${AGENT_NAME:-agent}]
+[status:handing-off]
+[type:handoff]
+[project:<PROJECT>]
+[timestamp:$timestamp]
+
+## Handoff
+
 ### Accomplished
 <description>
-### Current state
-<files, branch, build status, open bugs>
-### Next steps
-<concrete actions for next agent>
-### Blockers
-<what needs human or external resolution>
-### Key decisions
-<rationale, alternatives rejected>" \
-  | memvid put "$MEMVID_DIR/global_memory.mv2" --embedding -m nomic --vector-compression
+
+### State
+<files, commands, open bugs>
+
+### Next
+<actions for next agent>
+EOF
+
+chmod 0644 "$tmp"
+mv "$tmp" "$queue/${timestamp}_handoff_$(uuidgen).md"
 ```
 
----
+## Memory Boundaries
 
-## 6. Agent Self-Identification
-
-| Runtime signal                                                    | Use tag             |
-|-------------------------------------------------------------------|---------------------|
-| `CLAUDE_CODE=1` env, or `claude` CLI context                      | `[agent:claude-code]` |
-| Claude Desktop app (no shell, MCP transport)                      | `[agent:claude-desktop]` |
-| `codex` CLI context, OpenAI Codex runtime                         | `[agent:codex]`     |
-| `gemini` CLI context, Google Gemini runtime                       | `[agent:gemini]`    |
-| GitLab Duo IDE/Web context                                        | `[agent:gitlab-duo]`|
-
----
-
-## 7. End-of-Session Protocol
-
-Before ending:
-1. Write final status to `memvid.mv2` with appropriate `[status:...]`.
-2. Write one-paragraph summary to `global_memory.mv2` with `[status:done]`.
-3. If handing off, complete §5 record.
-
----
-
-## 8. Platform Paths
-
-| Platform     | `MEMVID_DIR`                       |
-|--------------|------------------------------------|
-| Linux (WSL)  | `/home/foobis/memvid/`             |
-| Linux Native | `/home/omen/memvid/`               |
-| Windows      | `C:\Users\Foobis\memvid\`          |
-
-Files within:
-* `global_memory.mv2` — cross-agent visibility
-* `memvid.mv2` — project memory
-
----
-
-## 9. Fail-Safe & System Hardening
-
-**Enforced Local Protocol:**
-The system-wide binary at `/usr/local/bin/memvid` is a hardened wrapper. The original binary has been moved to `/usr/local/bin/memvid-core`. Agents MUST NOT attempt to call `memvid-core` directly; use only `memvid`.
-
-If any `memvid` invocation errors:
-1. Log full stderr to `$MEMVID_DIR/errors.log`.
-2. Continue the user's task. Do NOT abort.
-3. Surface a one-line note if memory loss affects work.
-
----
-
-## 10. Memvid CLI — Local Quick Reference
-
-```bash
-memvid create <file>                              # Create local .mv2
-memvid put <file> --input <doc> --embedding -m nomic --vector-compression
-memvid find <file> --query <text> --mode sem --top-k 5
-memvid ask <file> --question <text> --use-model "ollama:qwen2.5:1.5b"
-memvid doctor <file> --vacuum                     # Maintenance
-memvid timeline <file> --limit 20                 # Chronological view
-```
+- Do not use native agent memory for project facts, architecture, or conventions when the queue is available.
+- Do not create persistent agent-specific memory files unless required for tool startup.
+- If an agent requires a local instruction file to run, keep it limited to this protocol and route durable knowledge through Memvid.
+- Search or inspect ordinary project files only as needed for the current task; do not use broad reads as a memory substitute.
